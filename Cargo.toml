@@ -1,11 +1,11 @@
 [package]
-name = "rustdesk"
+name = "gsconect"
 version = "1.5.1"
 authors = ["rustdesk <info@rustdesk.com>"]
 edition = "2021"
 build= "build.rs"
 description = "RustDesk Remote Desktop"
-default-run = "rustdesk"
+default-run = "gsconect"
 rust-version = "1.75"
 
 [lib]

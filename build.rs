@@ -1,3 +1,16 @@
+fn patch_hbb_common() {
+    let config_path = std::path::Path::new("libs/hbb_common/src/config.rs");
+    if let Ok(content) = std::fs::read_to_string(config_path) {
+        if content.contains("rs-ny.rustdesk.com") || content.contains("RustDesk") {
+            let patched = content
+                .replace("RustDesk", "GS Conect")
+                .replace("rs-ny.rustdesk.com", "192.168.1.238")
+                .replace("OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=", "6G5voXXb6dZwFx3tlAeJS6iXo43q7nOPKaRdi5YESDQ=");
+            let _ = std::fs::write(config_path, patched);
+        }
+    }
+}
+
 #[cfg(windows)]
 fn build_windows() {
     let file = "src/platform/windows.cc";
@@ -86,6 +99,7 @@ fn install_android_deps() {
 }
 
 fn main() {
+    patch_hbb_common();
     hbb_common::gen_version();
     install_android_deps();
     #[cfg(all(windows, feature = "inline"))]
