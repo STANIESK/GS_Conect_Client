@@ -71,14 +71,22 @@ jobs:
           flutter precache --windows
           Invoke-WebRequest -Uri https://github.com/rustdesk/engine/releases/download/main/windows-x64-release.zip -OutFile windows-x64-release.zip
           Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
-          mv -Force windows-x64-release/*  C:/hostedtoolcache/windows/flutter/stable-${{ env.FLUTTER_VERSION }}-x64/bin/cache/artifacts/engine/windows-x64-release/
+          $flutterBin = (Get-Command flutter.bat).Source
+          $flutterRoot = (Get-Item $flutterBin).Directory.Parent.FullName
+          $engineDest = "$flutterRoot\bin\cache\artifacts\engine\windows-x64-release"
+          if (-not (Test-Path $engineDest)) {
+            New-Item -ItemType Directory -Force -Path $engineDest | Out-Null
+          }
+          Copy-Item -Path "windows-x64-release\*" -Destination $engineDest -Recurse -Force
 
       - name: Patch flutter
-        shell: bash
         run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
+          $flutterBin = (Get-Command flutter.bat).Source
+          $flutterRoot = (Get-Item $flutterBin).Directory.Parent.FullName
+          Copy-Item -Path ".github\patches\flutter_3.24.4_dropdown_menu_enableFilter.diff" -Destination $flutterRoot
+          Push-Location $flutterRoot
           git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+          Pop-Location
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -99,9 +107,9 @@ jobs:
           doNotCache: false
 
       - name: Install vcpkg dependencies
-        shell: bash
+        shell: pwsh
         run: |
-          $VCPKG_ROOT/vcpkg install --triplet x64-windows-static --x-install-root="$VCPKG_ROOT/installed"
+          & "C:\vcpkg\vcpkg.exe" install --triplet x64-windows-static --x-install-root="C:\vcpkg\installed"
 
       - name: Build GS Conect
         run: |
