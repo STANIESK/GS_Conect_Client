@@ -130,6 +130,9 @@ jobs:
           Remove-Item -Path usbmmidd_v2\\Win32 -Recurse
           Remove-Item -Path "usbmmidd_v2\\deviceinstaller64.exe", "usbmmidd_v2\\deviceinstaller.exe", "usbmmidd_v2\\usbmmidd.bat"
           mv -Force .\\usbmmidd_v2 ./rustdesk
+          if (Test-Path ./rustdesk/rustdesk.exe) {
+            Move-Item -Force ./rustdesk/rustdesk.exe ./rustdesk/GS-Connect.exe
+          }
 
       - name: Copy Runner.res to portable packer
         continue-on-error: true
@@ -153,7 +156,7 @@ jobs:
           sed -i '/dpiAware/d' res/manifest.xml
           pushd ./libs/portable
           pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
+          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/GS-Connect.exe
           popd
           mkdir -p ./SignOutput
           cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/GS-Connect.exe

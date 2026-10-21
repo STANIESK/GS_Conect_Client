@@ -260,7 +260,7 @@ LegalCopyright = "Copyright (C) 2026 GSURF Tecnologia. Todos os direitos reserva
 ProductName = "GS Connect"
 CompanyName = "GSURF Tecnologia"
 FileDescription = "GS Connect"
-OriginalFilename = "rustdesk.exe"
+OriginalFilename = "GS-Connect.exe"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "0.1"

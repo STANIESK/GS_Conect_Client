@@ -18,9 +18,9 @@ const APP_METADATA: &[u8] = &[];
 const APP_METADATA_CONFIG: &str = "meta.toml";
 const META_LINE_PREFIX_TIMESTAMP: &str = "timestamp = ";
 const META_LINE_PREFIX_FILE: &str = "file = ";
-const APP_PREFIX: &str = "rustdesk";
+const APP_PREFIX: &str = "gs-connect";
 #[cfg(windows)]
-const VERIFIED_UPDATE_FILE_PREFIX: &str = "rustdesk-verified-";
+const VERIFIED_UPDATE_FILE_PREFIX: &str = "gs-connect-verified-";
 const APPNAME_RUNTIME_ENV_KEY: &str = "RUSTDESK_APPNAME";
 #[cfg(windows)]
 const SET_FOREGROUND_WINDOW_ENV_KEY: &str = "SET_FOREGROUND_WINDOW";
@@ -192,7 +192,18 @@ fn setup(
     win::copy_runtime_broker(&dir);
     #[cfg(linux)]
     reader.configure_permission(&dir);
-    Some(dir.join(&reader.exe))
+
+    let cur_name = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| reader.exe.clone());
+
+    let target_file = dir.join(&cur_name);
+    let default_file = dir.join(&reader.exe);
+    if target_file != default_file && default_file.exists() {
+        std::fs::copy(&default_file, &target_file).ok();
+    }
+    Some(if target_file.exists() { target_file } else { default_file })
 }
 
 fn use_null_stdio() -> bool {
