@@ -193,7 +193,6 @@ pub fn core_main() -> Option<CoreMainAction> {
         && _is_quick_support
         && !_is_elevate
         && !_is_run_as_system
-        && config::LocalConfig::get_option("pre-elevate-service") == "Y"
     {
         use crate::portable_service::client;
         if let Err(e) = client::start_portable_service(client::StartPara::Direct) {
