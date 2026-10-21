@@ -52,109 +52,9 @@ jobs:
           submodules: recursive
 
       - name: Patch hbb_common config.rs for GS Connect and Quick Support
+        shell: bash
         run: |
-          $configPath = "libs\hbb_common\src\config.rs"
-          $content = [System.IO.File]::ReadAllText($configPath)
-          $content = $content.Replace('RwLock::new("RustDesk".to_owned())', 'RwLock::new("GS Connect".to_owned())')
-          $content = $content.Replace('&["rs-ny.rustdesk.com"]', '&["192.168.1.238"]')
-          $content = $content.Replace('OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=', '6G5voXXb6dZwFx3tlAeJS6iXo43q7nOPKaRdi5YESDQ=')
-          
-          # Inject QS detection and incoming-only hooks
-          $qsHelper = @"
-#[inline]
-pub fn is_qs_mode() -> bool {
-    if let Ok(name) = std::env::var("RUSTDESK_APPNAME") {
-        let lower = name.to_lowercase();
-        if lower.contains("suporte") || lower.contains("-qs") || lower.contains("_qs") || lower.contains("quick") {
-            return true;
-        }
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        let name = exe.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
-        if name.contains("suporte") || name.contains("-qs") || name.contains("_qs") || name.contains("quick") {
-            return true;
-        }
-    }
-    if std::env::args().any(|a| a == "--qs" || a == "--quick-support" || a == "--incoming-only") {
-        return true;
-    }
-    false
-}
-"@
-          $oldIncoming = @"
-#[inline]
-pub fn is_incoming_only() -> bool {
-    HARD_SETTINGS
-        .read()
-        .unwrap()
-        .get("conn-type")
-        .map_or(false, |x| x == ("incoming"))
-}
-"@
-          $newIncoming = @"
-$qsHelper
-
-#[inline]
-pub fn is_incoming_only() -> bool {
-    if is_qs_mode() {
-        return true;
-    }
-    HARD_SETTINGS
-        .read()
-        .unwrap()
-        .get("conn-type")
-        .map_or(false, |x| x == ("incoming"))
-}
-"@
-          $content = $content.Replace($oldIncoming, $newIncoming)
-
-          $oldSettings = @"
-#[inline]
-pub fn is_disable_settings() -> bool {
-    is_some_hard_opton("disable-settings")
-}
-"@
-          $newSettings = @"
-#[inline]
-pub fn is_disable_settings() -> bool {
-    if is_qs_mode() {
-        return true;
-    }
-    is_some_hard_opton("disable-settings")
-}
-"@
-          $content = $content.Replace($oldSettings, $newSettings)
-
-          $oldInstall = @"
-#[inline]
-pub fn is_disable_installation() -> bool {
-    is_some_hard_opton("disable-installation")
-}
-"@
-          $newInstall = @"
-#[inline]
-pub fn is_disable_installation() -> bool {
-    if is_qs_mode() {
-        return true;
-    }
-    is_some_hard_opton("disable-installation")
-}
-"@
-          $content = $content.Replace($oldInstall, $newInstall)
-
-          $oldOpt = @"
-pub fn option2bool(option: &str, value: &str) -> bool {
-"@
-          $newOpt = @"
-pub fn option2bool(option: &str, value: &str) -> bool {
-    if is_qs_mode() && option == keys::OPTION_ALLOW_NUMERNIC_ONE_TIME_PASSWORD {
-        return true;
-    }
-"@
-          $content = $content.Replace($oldOpt, $newOpt)
-
-          [System.IO.File]::WriteAllText($configPath, $content)
-          Select-String -Path $configPath -Pattern "APP_NAME|is_qs_mode|RENDEZVOUS_SERVERS"
+          python3 .github/scripts/patch_client_qs.py
 
       - name: Restore bridge files
         uses: actions/download-artifact@v4
@@ -183,17 +83,17 @@ pub fn option2bool(option: &str, value: &str) -> bool {
           Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
           $flutterBin = (Get-Command flutter.bat).Source
           $flutterRoot = (Get-Item $flutterBin).Directory.Parent.FullName
-          $engineDest = "$flutterRoot\bin\cache\artifacts\engine\windows-x64-release"
+          $engineDest = "$flutterRoot\\bin\\cache\\artifacts\\engine\\windows-x64-release"
           if (-not (Test-Path $engineDest)) {
             New-Item -ItemType Directory -Force -Path $engineDest | Out-Null
           }
-          Copy-Item -Path "windows-x64-release\*" -Destination $engineDest -Recurse -Force
+          Copy-Item -Path "windows-x64-release\\*" -Destination $engineDest -Recurse -Force
 
       - name: Patch flutter
         run: |
           $flutterBin = (Get-Command flutter.bat).Source
           $flutterRoot = (Get-Item $flutterBin).Directory.Parent.FullName
-          Copy-Item -Path ".github\patches\flutter_3.24.4_dropdown_menu_enableFilter.diff" -Destination $flutterRoot
+          Copy-Item -Path ".github\\patches\\flutter_3.24.4_dropdown_menu_enableFilter.diff" -Destination $flutterRoot
           Push-Location $flutterRoot
           git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
           Pop-Location
@@ -212,24 +112,24 @@ pub fn option2bool(option: &str, value: &str) -> bool {
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgDirectory: C:\vcpkg
+          vcpkgDirectory: C:\\vcpkg
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
       - name: Install vcpkg dependencies
         shell: pwsh
         run: |
-          & "C:\vcpkg\vcpkg.exe" install --triplet x64-windows-static --x-install-root="C:\vcpkg\installed"
+          & "C:\\vcpkg\\vcpkg.exe" install --triplet x64-windows-static --x-install-root="C:\\vcpkg\\installed"
 
       - name: Build GS Connect
         run: |
-          python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
+          python3 .\\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
           Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
           Expand-Archive usbmmidd_v2.zip -DestinationPath .
-          Remove-Item -Path usbmmidd_v2\Win32 -Recurse
-          Remove-Item -Path "usbmmidd_v2\deviceinstaller64.exe", "usbmmidd_v2\deviceinstaller.exe", "usbmmidd_v2\usbmmidd.bat"
-          mv -Force .\usbmmidd_v2 ./rustdesk
+          Remove-Item -Path usbmmidd_v2\\Win32 -Recurse
+          Remove-Item -Path "usbmmidd_v2\\deviceinstaller64.exe", "usbmmidd_v2\\deviceinstaller.exe", "usbmmidd_v2\\usbmmidd.bat"
+          mv -Force .\\usbmmidd_v2 ./rustdesk
 
       - name: Copy Runner.res to portable packer
         continue-on-error: true
