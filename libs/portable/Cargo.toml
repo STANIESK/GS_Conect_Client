@@ -28,10 +28,10 @@ native-windows-gui = {version = "1.0", default-features = false, features = ["an
 
 [package.metadata.winres]
 LegalCopyright = "Copyright (C) 2026 GSURF Tecnologia. Todos os direitos reservados."
-ProductName = "GS Conect"
+ProductName = "GS Connect"
 CompanyName = "GSURF Tecnologia"
-OriginalFilename = "GS-Conect.exe"
-FileDescription = "GS Conect"
+OriginalFilename = "GS-Connect.exe"
+FileDescription = "GS Connect"
 #ProductVersion = ""
 
 [target.'cfg(target_os="windows")'.build-dependencies]

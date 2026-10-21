@@ -257,9 +257,9 @@ webrtc-sctp = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d
 
 [package.metadata.winres]
 LegalCopyright = "Copyright (C) 2026 GSURF Tecnologia. Todos os direitos reservados."
-ProductName = "GS Conect"
+ProductName = "GS Connect"
 CompanyName = "GSURF Tecnologia"
-FileDescription = "GS Conect"
+FileDescription = "GS Connect"
 OriginalFilename = "rustdesk.exe"
 
 [target.'cfg(target_os="windows")'.build-dependencies]

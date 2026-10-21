@@ -1,4 +1,4 @@
-name: Compilar GS Conect Windows (x64)
+name: Compilar GS Connect Windows (x64)
 
 on:
   workflow_dispatch:
@@ -31,8 +31,8 @@ jobs:
       platform: x64
       target_version: Windows10
 
-  build-gsconect-windows:
-    name: Compilar GS-Conect.exe (x86_64)
+  build-gsconnect-windows:
+    name: Compilar GS-Connect.exe (x86_64)
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
     runs-on: windows-2022
     defaults:
@@ -51,15 +51,110 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Patch hbb_common config.rs for GS Conect
+      - name: Patch hbb_common config.rs for GS Connect and Quick Support
         run: |
           $configPath = "libs\hbb_common\src\config.rs"
           $content = [System.IO.File]::ReadAllText($configPath)
-          $content = $content.Replace('RwLock::new("RustDesk".to_owned())', 'RwLock::new("GS Conect".to_owned())')
+          $content = $content.Replace('RwLock::new("RustDesk".to_owned())', 'RwLock::new("GS Connect".to_owned())')
           $content = $content.Replace('&["rs-ny.rustdesk.com"]', '&["192.168.1.238"]')
           $content = $content.Replace('OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=', '6G5voXXb6dZwFx3tlAeJS6iXo43q7nOPKaRdi5YESDQ=')
+          
+          # Inject QS detection and incoming-only hooks
+          $qsHelper = @"
+#[inline]
+pub fn is_qs_mode() -> bool {
+    if let Ok(name) = std::env::var("RUSTDESK_APPNAME") {
+        let lower = name.to_lowercase();
+        if lower.contains("suporte") || lower.contains("-qs") || lower.contains("_qs") || lower.contains("quick") {
+            return true;
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let name = exe.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+        if name.contains("suporte") || name.contains("-qs") || name.contains("_qs") || name.contains("quick") {
+            return true;
+        }
+    }
+    if std::env::args().any(|a| a == "--qs" || a == "--quick-support" || a == "--incoming-only") {
+        return true;
+    }
+    false
+}
+"@
+          $oldIncoming = @"
+#[inline]
+pub fn is_incoming_only() -> bool {
+    HARD_SETTINGS
+        .read()
+        .unwrap()
+        .get("conn-type")
+        .map_or(false, |x| x == ("incoming"))
+}
+"@
+          $newIncoming = @"
+$qsHelper
+
+#[inline]
+pub fn is_incoming_only() -> bool {
+    if is_qs_mode() {
+        return true;
+    }
+    HARD_SETTINGS
+        .read()
+        .unwrap()
+        .get("conn-type")
+        .map_or(false, |x| x == ("incoming"))
+}
+"@
+          $content = $content.Replace($oldIncoming, $newIncoming)
+
+          $oldSettings = @"
+#[inline]
+pub fn is_disable_settings() -> bool {
+    is_some_hard_opton("disable-settings")
+}
+"@
+          $newSettings = @"
+#[inline]
+pub fn is_disable_settings() -> bool {
+    if is_qs_mode() {
+        return true;
+    }
+    is_some_hard_opton("disable-settings")
+}
+"@
+          $content = $content.Replace($oldSettings, $newSettings)
+
+          $oldInstall = @"
+#[inline]
+pub fn is_disable_installation() -> bool {
+    is_some_hard_opton("disable-installation")
+}
+"@
+          $newInstall = @"
+#[inline]
+pub fn is_disable_installation() -> bool {
+    if is_qs_mode() {
+        return true;
+    }
+    is_some_hard_opton("disable-installation")
+}
+"@
+          $content = $content.Replace($oldInstall, $newInstall)
+
+          $oldOpt = @"
+pub fn option2bool(option: &str, value: &str) -> bool {
+"@
+          $newOpt = @"
+pub fn option2bool(option: &str, value: &str) -> bool {
+    if is_qs_mode() && option == keys::OPTION_ALLOW_NUMERNIC_ONE_TIME_PASSWORD {
+        return true;
+    }
+"@
+          $content = $content.Replace($oldOpt, $newOpt)
+
           [System.IO.File]::WriteAllText($configPath, $content)
-          Select-String -Path $configPath -Pattern "APP_NAME|RENDEZVOUS_SERVERS|RS_PUB_KEY"
+          Select-String -Path $configPath -Pattern "APP_NAME|is_qs_mode|RENDEZVOUS_SERVERS"
 
       - name: Restore bridge files
         uses: actions/download-artifact@v4
@@ -126,7 +221,7 @@ jobs:
         run: |
           & "C:\vcpkg\vcpkg.exe" install --triplet x64-windows-static --x-install-root="C:\vcpkg\installed"
 
-      - name: Build GS Conect
+      - name: Build GS Connect
         run: |
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
@@ -152,7 +247,7 @@ jobs:
           name: topmostwindow-artifacts-x64
           path: "./rustdesk"
 
-      - name: Build self-extracted executable (GS-Conect.exe)
+      - name: Build self-extracted executables (GS-Connect.exe & GS-Connect-Suporte.exe)
         shell: bash
         run: |
           sed -i '/dpiAware/d' res/manifest.xml
@@ -161,10 +256,14 @@ jobs:
           python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
           popd
           mkdir -p ./SignOutput
-          mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/GS-Conect.exe
+          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/GS-Connect.exe
+          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/GS-Connect-Suporte.exe
+          ls -lh ./SignOutput/
 
-      - name: Upload GS-Conect.exe
+      - name: Upload GS Connect Windows Binaries
         uses: actions/upload-artifact@v4
         with:
-          name: GS-Conect-Windows-x64
-          path: ./SignOutput/GS-Conect.exe
+          name: GS-Connect-Windows-x64
+          path: |
+            ./SignOutput/GS-Connect.exe
+            ./SignOutput/GS-Connect-Suporte.exe

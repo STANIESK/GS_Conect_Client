@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "GSURF Tecnologia" "\0"
-            VALUE "FileDescription", "GS Conect" "\0"
+            VALUE "FileDescription", "GS Connect" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "rustdesk" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 GSURF Tecnologia. Todos os direitos reservados." "\0"
             VALUE "OriginalFilename", "rustdesk.exe" "\0"
-            VALUE "ProductName", "GS Conect" "\0"
+            VALUE "ProductName", "GS Connect" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
