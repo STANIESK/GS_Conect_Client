@@ -49,6 +49,16 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Patch hbb_common config.rs for GS Conect
+        run: |
+          $configPath = "libs\hbb_common\src\config.rs"
+          $content = [System.IO.File]::ReadAllText($configPath)
+          $content = $content.Replace('RwLock::new("RustDesk".to_owned())', 'RwLock::new("GS Conect".to_owned())')
+          $content = $content.Replace('&["rs-ny.rustdesk.com"]', '&["192.168.1.238"]')
+          $content = $content.Replace('OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=', '6G5voXXb6dZwFx3tlAeJS6iXo43q7nOPKaRdi5YESDQ=')
+          [System.IO.File]::WriteAllText($configPath, $content)
+          Select-String -Path $configPath -Pattern "APP_NAME|RENDEZVOUS_SERVERS|RS_PUB_KEY"
+
       - name: Restore bridge files
         uses: actions/download-artifact@v4
         with:
@@ -123,6 +133,16 @@ jobs:
           Remove-Item -Path usbmmidd_v2\Win32 -Recurse
           Remove-Item -Path "usbmmidd_v2\deviceinstaller64.exe", "usbmmidd_v2\deviceinstaller.exe", "usbmmidd_v2\usbmmidd.bat"
           mv -Force .\usbmmidd_v2 ./rustdesk
+
+      - name: Copy Runner.res to portable packer
+        continue-on-error: true
+        shell: bash
+        run: |
+          runner_res=$(find . -name "Runner.res")
+          if [ -n "$runner_res" ]; then
+            echo "Found Runner.res: $runner_res"
+            cp $runner_res ./libs/portable/Runner.res
+          fi
 
       - name: Download RustDeskTempTopMostWindow artifacts
         uses: actions/download-artifact@v4
