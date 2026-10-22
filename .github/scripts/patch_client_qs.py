@@ -115,5 +115,25 @@ pub fn is_disable_installation() -> bool {
 
     print("Successfully patched libs/hbb_common/src/config.rs for GS Connect and Quick Support")
 
+    # 8. Ensure asInvoker execution level in Windows manifests to disable UAC heuristic prompt
+    manifest_files = [os.path.join("res", "manifest.xml"), os.path.join("flutter", "windows", "runner", "runner.exe.manifest")]
+    trust_info = """  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+"""
+    for mf in manifest_files:
+        if os.path.exists(mf):
+            with open(mf, "r", encoding="utf-8") as mf_f:
+                mfc = mf_f.read()
+            if "trustInfo" not in mfc:
+                mfc = mfc.replace('<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">', '<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">\n' + trust_info)
+                with open(mf, "w", encoding="utf-8") as mf_f:
+                    mf_f.write(mfc)
+                print(f"Patched {mf} with asInvoker trustInfo")
+
 if __name__ == "__main__":
     main()
