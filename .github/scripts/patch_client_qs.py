@@ -13,7 +13,7 @@ def main():
     # 1. Branding
     content = content.replace('RwLock::new("RustDesk".to_owned())', 'RwLock::new("GS Connect".to_owned())')
     # 2. Server IP
-    content = content.replace('&["rs-ny.rustdesk.com"]', '&["192.168.1.238"]')
+    content = content.replace('&["rs-ny.rustdesk.com"]', '&["gsconnect.gsurfnet.com"]')
     # 3. Server Public Key
     content = content.replace('OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=', '6G5voXXb6dZwFx3tlAeJS6iXo43q7nOPKaRdi5YESDQ=')
 
