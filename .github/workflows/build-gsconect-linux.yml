@@ -50,9 +50,13 @@ jobs:
       - name: Install system dependencies
         shell: bash
         run: |
-          sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
-          sudo apt-get update -y
-          sudo apt-get install -y \
+          # Wait for any background apt lock
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for apt lock..."
+            sleep 2
+          done
+          sudo apt-get update -y || sudo apt-get update --fix-missing -y || true
+          sudo apt-get install -y --no-install-recommends \
             build-essential clang cmake curl gcc git g++ nasm ninja-build pkg-config \
             libayatana-appindicator3-dev libasound2-dev libclang-dev libgstreamer1.0-dev \
             libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev \
