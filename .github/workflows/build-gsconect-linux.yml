@@ -6,6 +6,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: gsconnect-linux-deb
+  cancel-in-progress: true
+
 env:
   RUST_VERSION: "1.75"
   LLVM_VERSION: "15.0.6"
@@ -16,12 +20,8 @@ env:
   UPLOAD_ARTIFACT: "true"
 
 jobs:
-  generate-bridge:
-    uses: ./.github/workflows/bridge.yml
-
   build-gsconnect-linux:
     name: Compilar GS-Connect Linux x64 (.deb)
-    needs: [generate-bridge]
     runs-on: ubuntu-22.04
     steps:
       - name: Export GitHub Actions cache environment variables
@@ -41,18 +41,16 @@ jobs:
         run: |
           python3 .github/scripts/patch_client_qs.py
 
-      - name: Restore bridge files
-        uses: actions/download-artifact@v4
-        with:
-          name: bridge-artifact
-          path: ./
-
       - name: Install system dependencies
         shell: bash
         run: |
-          sudo apt-get install ca-certificates -y
-          sudo apt-get -y update
-          sudo apt-get install -y \
+          export DEBIAN_FRONTEND=noninteractive
+          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer unattended-upgrades || true
+          sudo killall -9 apt apt-get unattended-upgr || true
+          sudo rm -rf /etc/apt/sources.list.d/*
+          sudo dpkg --configure -a || true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install -y \
             clang \
             cmake \
             curl \
@@ -78,7 +76,7 @@ jobs:
             ninja-build \
             pkg-config \
             wget
-          sudo apt-get remove -y libopus-dev || true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y libopus-dev || true
 
       - name: Install flutter
         uses: subosito/flutter-action@v2

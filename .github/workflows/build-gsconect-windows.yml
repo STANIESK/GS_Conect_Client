@@ -6,6 +6,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: gsconnect-windows-x64
+  cancel-in-progress: true
+
 env:
   RUST_VERSION: "1.75"
   SCITER_RUST_VERSION: "1.75"
@@ -19,21 +23,8 @@ env:
   PUBLISH_UPDATE_METADATA: "false"
 
 jobs:
-  generate-bridge:
-    uses: ./.github/workflows/bridge.yml
-
-  build-RustDeskTempTopMostWindow:
-    uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
-    with:
-      upload-artifact: true
-      target: windows-2022
-      configuration: Release
-      platform: x64
-      target_version: Windows10
-
   build-gsconnect-windows:
     name: Compilar GS-Connect.exe (x86_64)
-    needs: [build-RustDeskTempTopMostWindow, generate-bridge]
     runs-on: windows-2022
     defaults:
       run:
@@ -55,12 +46,6 @@ jobs:
         shell: bash
         run: |
           python3 .github/scripts/patch_client_qs.py
-
-      - name: Restore bridge files
-        uses: actions/download-artifact@v4
-        with:
-          name: bridge-artifact
-          path: ./
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
@@ -134,7 +119,7 @@ jobs:
             Move-Item -Force ./rustdesk/rustdesk.exe ./rustdesk/GS-Connect.exe
           }
 
-      - name: Copy Runner.res to portable packer
+      - name: Copy Runner.res and WindowInjection.dll to portable packer
         continue-on-error: true
         shell: bash
         run: |
@@ -143,12 +128,9 @@ jobs:
             echo "Found Runner.res: $runner_res"
             cp $runner_res ./libs/portable/Runner.res
           fi
-
-      - name: Download RustDeskTempTopMostWindow artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: topmostwindow-artifacts-x64
-          path: "./rustdesk"
+          if [ -f "res/topmost/WindowInjection.dll" ]; then
+            cp res/topmost/WindowInjection.dll ./rustdesk/WindowInjection.dll
+          fi
 
       - name: Build self-extracted executables (GS-Connect.exe & GS-Connect-Suporte.exe)
         shell: bash
