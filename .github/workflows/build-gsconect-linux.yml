@@ -1,0 +1,132 @@
+name: Compilar GS Connect Linux (.deb)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  RUST_VERSION: "1.75"
+  LLVM_VERSION: "15.0.6"
+  FLUTTER_VERSION: "3.24.5"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  VCPKG_ROOT: "/opt/artifacts/vcpkg"
+  UPLOAD_ARTIFACT: "true"
+
+jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+
+  build-gsconnect-linux:
+    name: Compilar GS-Connect Linux x64 (.deb)
+    needs: [generate-bridge]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Patch hbb_common, SSO Lock and Quick Support
+        shell: bash
+        run: |
+          python3 .github/scripts/patch_client_qs.py
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            build-essential clang cmake curl gcc git g++ nasm ninja-build pkg-config \
+            libayatana-appindicator3-dev libasound2-dev libclang-dev libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev \
+            libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxdo-dev libxfixes-dev \
+            libpam0g-dev libssl-dev libdrm-dev
+
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: x64
+
+      - name: Patch flutter
+        shell: bash
+        run: |
+          flutter_root=$(dirname $(dirname $(which flutter)))
+          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff "$flutter_root/"
+          pushd "$flutter_root"
+          git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+          popd
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-unknown-linux-gnu
+          components: "rustfmt"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ubuntu-22.04
+
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: /opt/artifacts/vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        shell: bash
+        run: |
+          $VCPKG_ROOT/vcpkg install --triplet x64-linux --x-install-root="$VCPKG_ROOT/installed"
+
+      - name: Build GS Connect Core Library
+        shell: bash
+        run: |
+          export VCPKG_ROOT=/opt/artifacts/vcpkg
+          cargo build --locked --lib --features hwcodec,flutter,unix-file-copy-paste --release
+
+      - name: Refactor FFI bindings and Build Flutter Linux Release
+        shell: bash
+        run: |
+          python3 -c '
+          with open("flutter/lib/generated_bridge.dart", "r") as f:
+              c = f.read()
+          c = c.replace("ffi.NativeFunction<ffi.Bool Function(DartPort", "ffi.NativeFunction<ffi.Uint8 Function(DartPort")
+          with open("flutter/lib/generated_bridge.dart", "w") as f:
+              f.write(c)
+          '
+          pushd flutter
+          flutter build linux --release
+          popd
+
+      - name: Generate GS Connect Debian Packages (.deb)
+        shell: bash
+        run: |
+          python3 .github/scripts/package_linux_deb.py
+
+      - name: Upload Linux Debian Packages (.deb)
+        uses: actions/upload-artifact@v4
+        with:
+          name: GS-Connect-Linux-deb
+          path: |
+            ./deb_output/gs-connect.deb
+            ./deb_output/gs-connect-suporte.deb

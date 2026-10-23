@@ -1,11 +1,11 @@
 import os
 import sys
 
-def main():
+def patch_hbb_common_config():
     config_path = os.path.join("libs", "hbb_common", "src", "config.rs")
     if not os.path.exists(config_path):
         print(f"Error: {config_path} not found", file=sys.stderr)
-        sys.exit(1)
+        return False
 
     with open(config_path, "r", encoding="utf-8") as f:
         content = f.read()
@@ -66,7 +66,7 @@ pub fn is_incoming_only() -> bool {{
         content = content.replace(old_incoming, new_incoming, 1)
         print("Patched is_incoming_only with QS support.")
     else:
-        print("Warning: old_incoming not found")
+        print("Notice: old_incoming already patched or not found")
 
     # 5. Disable settings in QS mode
     old_settings = """#[inline]
@@ -114,8 +114,64 @@ pub fn is_disable_installation() -> bool {
         f.write(content)
 
     print("Successfully patched libs/hbb_common/src/config.rs for GS Connect and Quick Support")
+    return True
 
-    # 8. Ensure asInvoker execution level in Windows manifests to disable UAC heuristic prompt
+def patch_sso_enforcement():
+    # 1. Rust layer: src/ui_session_interface.rs
+    ui_session_path = os.path.join("src", "ui_session_interface.rs")
+    if os.path.exists(ui_session_path):
+        with open(ui_session_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        old_token = '    let token = LocalConfig::get_option("access_token");\n    let key = crate::get_key(false).await;'
+        new_token = '''    let token = LocalConfig::get_option("access_token");
+    if token.is_empty() {
+        handler.on_error("Acesso Restrito: É obrigatório autenticar com sua conta Google Workspace (@gsurf.com.br / @gsurfnet.com) no GS Connect para estabelecer conexões remotas.");
+        return;
+    }
+    let key = crate::get_key(false).await;'''
+
+        if old_token in content:
+            content = content.replace(old_token, new_token, 1)
+            with open(ui_session_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print("Successfully patched src/ui_session_interface.rs with Google SSO outbound connection lock.")
+        else:
+            print("Notice: src/ui_session_interface.rs already patched or target not found.")
+
+    # 2. Flutter UI layer: flutter/lib/common.dart
+    common_dart_path = os.path.join("flutter", "lib", "common.dart")
+    if os.path.exists(common_dart_path):
+        with open(common_dart_path, "r", encoding="utf-8") as f:
+            dart_content = f.read()
+
+        # Import login.dart if not present
+        if "import 'common/widgets/login.dart';" not in dart_content:
+            target_imp = "import 'common/widgets/overlay.dart';"
+            if target_imp in dart_content:
+                dart_content = dart_content.replace(target_imp, target_imp + "\nimport 'common/widgets/login.dart';")
+                print("Added import of login.dart to flutter/lib/common.dart")
+
+        # Inject SSO check in connectMainDesktop
+        old_fn = "bool? isSharedPassword}) async {\n  if (isFileTransfer) {"
+        new_fn = """bool? isSharedPassword}) async {
+  final authToken = bind.mainGetLocalOption(key: 'access_token');
+  if (authToken.isEmpty) {
+    showToast("Acesso Restrito: É obrigatório autenticar com sua conta Google Workspace (@gsurf.com.br / @gsurfnet.com) para estabelecer conexões remotas.");
+    loginDialog();
+    return;
+  }
+  if (isFileTransfer) {"""
+
+        if old_fn in dart_content:
+            dart_content = dart_content.replace(old_fn, new_fn, 1)
+            with open(common_dart_path, "w", encoding="utf-8") as f:
+                f.write(dart_content)
+            print("Successfully patched flutter/lib/common.dart with UI Google SSO lock.")
+        else:
+            print("Notice: flutter/lib/common.dart already patched or target not found.")
+
+def patch_manifests():
     manifest_files = [os.path.join("res", "manifest.xml"), os.path.join("flutter", "windows", "runner", "runner.exe.manifest")]
     trust_info = """  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
@@ -134,6 +190,11 @@ pub fn is_disable_installation() -> bool {
                 with open(mf, "w", encoding="utf-8") as mf_f:
                     mf_f.write(mfc)
                 print(f"Patched {mf} with asInvoker trustInfo")
+
+def main():
+    patch_hbb_common_config()
+    patch_sso_enforcement()
+    patch_manifests()
 
 if __name__ == "__main__":
     main()
