@@ -33,6 +33,19 @@ def main():
     os.makedirs(f"{pkg_full}/usr/share/icons/hicolor/256x256/apps", exist_ok=True)
     os.makedirs(f"{pkg_full}/usr/share/icons/hicolor/scalable/apps", exist_ok=True)
     os.makedirs(f"{pkg_full}/usr/share/gs-connect/files/systemd", exist_ok=True)
+    os.makedirs(f"{pkg_full}/etc/gs-connect", exist_ok=True)
+    with open(f"{pkg_full}/etc/gs-connect/GS-Connect2.toml", "w", encoding="utf-8") as f_cfg:
+        f_cfg.write("""rendezvous_server = 'gsconnect.gsurfnet.com:21116'
+relay_server = 'gsconnect.gsurfnet.com:21117'
+api_server = 'https://gsconnect.gsurfnet.com'
+key = '6G5voXXb6dZwFx3tlAeJS6iXo43q7nOPKaRdi5YESDQ='
+
+[options]
+custom-rendezvous-server = 'gsconnect.gsurfnet.com'
+relay-server = 'gsconnect.gsurfnet.com'
+api-server = 'https://gsconnect.gsurfnet.com'
+key = '6G5voXXb6dZwFx3tlAeJS6iXo43q7nOPKaRdi5YESDQ='
+""")
     os.makedirs(f"{pkg_full}/DEBIAN", exist_ok=True)
     os.chmod(f"{pkg_full}/DEBIAN", 0o755)
 
@@ -113,6 +126,10 @@ Description: GS Connect - Plataforma Corporativa Oficial de Acesso Remoto GSurf.
 set -e
 if [ "$1" = "configure" ]; then
     mkdir -p /usr/lib/systemd/system/
+    mkdir -p /etc/gs-connect /etc/rustdesk
+    if [ -f /etc/gs-connect/GS-Connect2.toml ]; then
+        cp -n /etc/gs-connect/GS-Connect2.toml /etc/rustdesk/RustDesk2.toml || true
+    fi
     cp /usr/share/gs-connect/files/systemd/gs-connect.service /usr/lib/systemd/system/gs-connect.service
     if command -v systemctl >/dev/null 2>&1; then
         systemctl daemon-reload || true
