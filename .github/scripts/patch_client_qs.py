@@ -191,10 +191,39 @@ def patch_manifests():
                     mf_f.write(mfc)
                 print(f"Patched {mf} with asInvoker trustInfo")
 
+
+def patch_client_avoid_secure_tcp():
+    client_rs_path = os.path.join("src", "client.rs")
+    if os.path.exists(client_rs_path):
+        with open(client_rs_path, "r", encoding="utf-8") as f:
+            c = f.read()
+        c = c.replace(
+            "let legacy_secure = !key.is_empty() && (!token.is_empty() || !switch_code.is_empty());",
+            "let legacy_secure = false;"
+        )
+        c = c.replace(
+            "if !key.is_empty() && (!token.is_empty() || !switch_code.is_empty()) {",
+            "if false {"
+        )
+        with open(client_rs_path, "w", encoding="utf-8") as f:
+            f.write(c)
+        print("Successfully patched src/client.rs to prevent secure_tcp deadline elapsed on open-source hbbs.")
+
+    ui_session_path = os.path.join("src", "ui_session_interface.rs")
+    if os.path.exists(ui_session_path):
+        with open(ui_session_path, "r", encoding="utf-8") as f:
+            u = f.read()
+        u = u.replace("remote.io_loop(&key, &token, round).await;", 'remote.io_loop(&key, "", round).await;')
+        u = u.replace("&token,", '"",')
+        with open(ui_session_path, "w", encoding="utf-8") as f:
+            f.write(u)
+        print("Successfully patched src/ui_session_interface.rs to pass empty token to io_loop.")
+
 def main():
     patch_hbb_common_config()
     patch_sso_enforcement()
     patch_manifests()
+    patch_client_avoid_secure_tcp()
 
 if __name__ == "__main__":
     main()
