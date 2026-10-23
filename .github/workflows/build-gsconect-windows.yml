@@ -161,6 +161,7 @@ jobs:
           mkdir -p ./SignOutput
           cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/GS-Connect.exe
           cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/GS-Connect-Suporte.exe
+          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/GS-Connect-Setup.exe
           ls -lh ./SignOutput/
 
       - name: Upload GS Connect Windows Binaries
@@ -170,3 +171,4 @@ jobs:
           path: |
             ./SignOutput/GS-Connect.exe
             ./SignOutput/GS-Connect-Suporte.exe
+            ./SignOutput/GS-Connect-Setup.exe
