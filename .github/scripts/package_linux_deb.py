@@ -13,7 +13,6 @@ def main():
     version = os.environ.get("VERSION", "1.4.18")
     flutter_bundle = os.path.abspath("flutter/build/linux/x64/release/bundle")
     if not os.path.exists(flutter_bundle):
-        # Look for release folder
         candidates = glob.glob("flutter/build/linux/**/release/bundle", recursive=True)
         if candidates:
             flutter_bundle = os.path.abspath(candidates[0])
@@ -35,11 +34,13 @@ def main():
     os.makedirs(f"{pkg_full}/usr/share/icons/hicolor/scalable/apps", exist_ok=True)
     os.makedirs(f"{pkg_full}/usr/share/gs-connect/files/systemd", exist_ok=True)
     os.makedirs(f"{pkg_full}/DEBIAN", exist_ok=True)
+    os.chmod(f"{pkg_full}/DEBIAN", 0o755)
 
     # Copy binary files
     run(f"cp -r {flutter_bundle}/* {pkg_full}/usr/share/gs-connect/")
     if os.path.exists(f"{pkg_full}/usr/share/gs-connect/rustdesk"):
         os.rename(f"{pkg_full}/usr/share/gs-connect/rustdesk", f"{pkg_full}/usr/share/gs-connect/gs-connect")
+        os.chmod(f"{pkg_full}/usr/share/gs-connect/gs-connect", 0o755)
     
     # Symlink in /usr/bin
     run(f"ln -s /usr/share/gs-connect/gs-connect {pkg_full}/usr/bin/gs-connect")
@@ -70,11 +71,19 @@ Keywords=gsconnect;gsurf;remote-control;rdp;desktop;
     with open(f"{pkg_full}/usr/share/gs-connect/files/systemd/gs-connect.service", "w", encoding="utf-8") as f:
         f.write("""[Unit]
 Description=GS Connect Unattended Remote Support Service
-After=network.target
+Requires=network.target
+After=systemd-user-sessions.service
 
 [Service]
 Type=simple
 ExecStart=/usr/share/gs-connect/gs-connect --service
+ExecStop=/usr/bin/pkill -f "gs-connect --"
+PIDFile=/run/gs-connect.pid
+KillMode=mixed
+TimeoutStopSec=30
+User=root
+LimitNOFILE=100000
+Environment="PULSE_LATENCY_MSEC=60" "PIPEWIRE_LATENCY=1024/48000"
 Restart=always
 RestartSec=5
 
@@ -96,6 +105,7 @@ Recommends: libayatana-appindicator3-1
 Description: GS Connect - Plataforma Corporativa Oficial de Acesso Remoto GSurf.
  Conexao remota segura de alta performance com autenticacao corporativa Google Workspace.
 """)
+    os.chmod(f"{pkg_full}/DEBIAN/control", 0o644)
 
     # DEBIAN/postinst
     with open(f"{pkg_full}/DEBIAN/postinst", "w", encoding="utf-8") as f:
@@ -143,11 +153,13 @@ fi
     os.makedirs(f"{pkg_qs}/usr/share/icons/hicolor/256x256/apps", exist_ok=True)
     os.makedirs(f"{pkg_qs}/usr/share/icons/hicolor/scalable/apps", exist_ok=True)
     os.makedirs(f"{pkg_qs}/DEBIAN", exist_ok=True)
+    os.chmod(f"{pkg_qs}/DEBIAN", 0o755)
 
     # Copy binary files
     run(f"cp -r {flutter_bundle}/* {pkg_qs}/usr/share/gs-connect-suporte/")
     if os.path.exists(f"{pkg_qs}/usr/share/gs-connect-suporte/rustdesk"):
         os.rename(f"{pkg_qs}/usr/share/gs-connect-suporte/rustdesk", f"{pkg_qs}/usr/share/gs-connect-suporte/gs-connect-suporte")
+        os.chmod(f"{pkg_qs}/usr/share/gs-connect-suporte/gs-connect-suporte", 0o755)
 
     # Wrapper script in /usr/bin/gs-connect-suporte
     with open(f"{pkg_qs}/usr/bin/gs-connect-suporte", "w", encoding="utf-8") as f:
@@ -191,6 +203,7 @@ Recommends: libayatana-appindicator3-1
 Description: GS Connect Suporte - Acesso Rapido para Suporte Tecnico GSurf.
  Versao compacta somente para recepcao de suporte (Incoming-Only, sem necessidade de login Google).
 """)
+    os.chmod(f"{pkg_qs}/DEBIAN/control", 0o644)
 
     # DEBIAN/postinst
     with open(f"{pkg_qs}/DEBIAN/postinst", "w", encoding="utf-8") as f:

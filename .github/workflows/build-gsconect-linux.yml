@@ -50,18 +50,35 @@ jobs:
       - name: Install system dependencies
         shell: bash
         run: |
-          # Wait for any background apt lock
-          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-            echo "Waiting for apt lock..."
-            sleep 2
-          done
-          sudo apt-get update -y || sudo apt-get update --fix-missing -y || true
-          sudo apt-get install -y --no-install-recommends \
-            build-essential clang cmake curl gcc git g++ nasm ninja-build pkg-config \
-            libayatana-appindicator3-dev libasound2-dev libclang-dev libgstreamer1.0-dev \
-            libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev \
-            libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxdo-dev libxfixes-dev \
-            libpam0g-dev libssl-dev libdrm-dev
+          sudo apt-get install ca-certificates -y
+          sudo apt-get -y update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            curl \
+            gcc \
+            git \
+            g++ \
+            libclang-dev \
+            llvm-dev \
+            libasound2-dev \
+            libunwind-dev \
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            libgtk-3-dev \
+            libpulse-dev \
+            libva-dev \
+            libvdpau-dev \
+            libxcb-randr0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libxdo-dev \
+            libxfixes-dev \
+            nasm \
+            ninja-build \
+            pkg-config \
+            wget
+          sudo apt-get remove -y libopus-dev || true
 
       - name: Install flutter
         uses: subosito/flutter-action@v2
@@ -106,18 +123,12 @@ jobs:
         shell: bash
         run: |
           export VCPKG_ROOT=/opt/artifacts/vcpkg
+          sed -i 's/\["cdylib", "staticlib", "rlib"\]/\["cdylib"\]/g' Cargo.toml
           cargo build --locked --lib --features hwcodec,flutter,unix-file-copy-paste --release
 
-      - name: Refactor FFI bindings and Build Flutter Linux Release
+      - name: Build Flutter Linux Release
         shell: bash
         run: |
-          python3 -c '
-          with open("flutter/lib/generated_bridge.dart", "r") as f:
-              c = f.read()
-          c = c.replace("ffi.NativeFunction<ffi.Bool Function(DartPort", "ffi.NativeFunction<ffi.Uint8 Function(DartPort")
-          with open("flutter/lib/generated_bridge.dart", "w") as f:
-              f.write(c)
-          '
           pushd flutter
           flutter build linux --release
           popd
